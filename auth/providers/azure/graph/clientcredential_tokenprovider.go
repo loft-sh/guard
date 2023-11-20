@@ -31,24 +31,26 @@ import (
 )
 
 type clientCredentialTokenProvider struct {
-	name         string
-	client       *http.Client
-	clientID     string
-	clientSecret string
-	scope        string
-	loginURL     string
+	name            string
+	client          *http.Client
+	clientID        string
+	clientSecret    string
+	clientAssertion string
+	scope           string
+	loginURL        string
 }
 
 // NewClientCredentialTokenProvider returns a TokenProvider that implements OAuth client credential flow on Azure Active Directory
 // https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow#get-a-token
-func NewClientCredentialTokenProvider(clientID, clientSecret, loginURL, scope string) TokenProvider {
+func NewClientCredentialTokenProvider(clientID, clientSecret, clientAssertion, loginURL, scope string) TokenProvider {
 	return &clientCredentialTokenProvider{
-		name:         "ClientCredentialTokenProvider",
-		client:       httpclient.DefaultHTTPClient,
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		scope:        scope,
-		loginURL:     loginURL,
+		name:            "ClientCredentialTokenProvider",
+		client:          httpclient.DefaultHTTPClient,
+		clientID:        clientID,
+		clientAssertion: clientAssertion,
+		clientSecret:    clientSecret,
+		scope:           scope,
+		loginURL:        loginURL,
 	}
 }
 
@@ -58,9 +60,14 @@ func (u *clientCredentialTokenProvider) Acquire(ctx context.Context, token strin
 	authResp := AuthResponse{}
 	form := url.Values{}
 	form.Set("client_id", u.clientID)
-	form.Set("client_secret", u.clientSecret)
-	form.Set("scope", u.scope)
+	if u.clientAssertion != "" {
+		form.Set("client_assertion", u.clientAssertion)
+		form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+	} else {
+		form.Set("client_secret", u.clientSecret)
+	}
 	form.Set("grant_type", "client_credentials")
+	form.Set("scope", u.scope)
 
 	req, err := http.NewRequest(http.MethodPost, u.loginURL, strings.NewReader(form.Encode()))
 	if err != nil {

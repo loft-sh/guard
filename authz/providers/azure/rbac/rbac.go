@@ -196,8 +196,8 @@ func New(opts authzOpts.Options, authopts auth.Options, authzInfo *AuthzInfo) (*
 	switch opts.AuthzMode {
 	case authzOpts.ARCAuthzMode:
 		// if client secret is there check use client credential provider
-		if authopts.ClientSecret != "" {
-			tokenProvider = graph.NewClientCredentialTokenProvider(authopts.ClientID, authopts.ClientSecret,
+		if authopts.ClientSecret != "" || authopts.ClientAssertion != "" {
+			tokenProvider = graph.NewClientCredentialTokenProvider(authopts.ClientID, authopts.ClientSecret, authopts.ClientAssertion,
 				fmt.Sprintf("%s%s/oauth2/v2.0/token", authzInfo.AADEndpoint, authopts.TenantID),
 				fmt.Sprintf("%s.default", authzInfo.ARMEndPoint))
 		} else {

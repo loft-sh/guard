@@ -407,11 +407,11 @@ func newUserInfo(tokenProvider TokenProvider, graphURL *url.URL, useGroupUID boo
 }
 
 // New returns a new UserInfo object
-func New(clientID, clientSecret, tenantID string, useGroupUID bool, aadEndpoint, msgraphHost string) (*UserInfo, error) {
+func New(clientID, clientSecret, clientAssertion, tenantID string, useGroupUID bool, aadEndpoint, msgraphHost string) (*UserInfo, error) {
 	graphEndpoint := "https://" + msgraphHost + "/"
 	graphURL, _ := url.Parse(graphEndpoint + "v1.0")
 
-	tokenProvider := NewClientCredentialTokenProvider(clientID, clientSecret,
+	tokenProvider := NewClientCredentialTokenProvider(clientID, clientSecret, clientAssertion,
 		fmt.Sprintf("%s%s/oauth2/v2.0/token", aadEndpoint, tenantID),
 		fmt.Sprintf("https://%s/.default", msgraphHost))
 
@@ -456,7 +456,7 @@ func NewWithARC(msiAudience, resourceId, tenantId, region string) (*UserInfo, er
 	return userInfo, nil
 }
 
-func TestUserInfo(clientID, clientSecret, loginUrl, apiUrl string, useGroupUID bool) (*UserInfo, error) {
+func TestUserInfo(clientID, clientSecret, clientAssertion, loginUrl, apiUrl string, useGroupUID bool) (*UserInfo, error) {
 	parsedApi, err := url.Parse(apiUrl)
 	if err != nil {
 		return nil, err
@@ -470,7 +470,7 @@ func TestUserInfo(clientID, clientSecret, loginUrl, apiUrl string, useGroupUID b
 		groupsPerCall: expandedGroupsPerCall,
 		useGroupUID:   useGroupUID,
 	}
-	u.tokenProvider = NewClientCredentialTokenProvider(clientID, clientSecret, loginUrl, "")
+	u.tokenProvider = NewClientCredentialTokenProvider(clientID, clientSecret, clientAssertion, loginUrl, "")
 	if err != nil {
 		return nil, err
 	}

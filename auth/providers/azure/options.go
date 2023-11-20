@@ -43,6 +43,7 @@ type Options struct {
 	Environment                              string
 	ClientID                                 string
 	ClientSecret                             string
+	ClientAssertion                          string
 	TenantID                                 string
 	UseGroupUID                              bool
 	AuthMode                                 string
@@ -60,8 +61,9 @@ type Options struct {
 
 func NewOptions() Options {
 	return Options{
-		ClientSecret: os.Getenv("AZURE_CLIENT_SECRET"),
-		UseGroupUID:  true,
+		ClientSecret:    os.Getenv("AZURE_CLIENT_SECRET"),
+		ClientAssertion: os.Getenv("AZURE_CLIENT_ASSERTION"),
+		UseGroupUID:     true,
 	}
 }
 
@@ -69,6 +71,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Environment, "azure.environment", o.Environment, "Azure cloud environment")
 	fs.StringVar(&o.ClientID, "azure.client-id", o.ClientID, "MS Graph application client ID to use")
 	fs.StringVar(&o.ClientSecret, "azure.client-secret", o.ClientSecret, "MS Graph application client secret to use")
+	fs.StringVar(&o.ClientAssertion, "azure.client-assertion", o.ClientAssertion, "MS Graph application client assertion (JWT) to use")
 	fs.StringVar(&o.TenantID, "azure.tenant-id", o.TenantID, "MS Graph application tenant id to use")
 	fs.BoolVar(&o.UseGroupUID, "azure.use-group-uid", o.UseGroupUID, "Use group UID for authentication instead of group display name")
 	fs.StringVar(&o.AuthMode, "azure.auth-mode", "client-credential", "auth mode to call graph api, valid value is either aks, arc, obo, client-credential or passthrough")
@@ -99,8 +102,8 @@ func (o *Options) Validate() []error {
 	}
 
 	if o.AuthMode != AKSAuthMode && o.AuthMode != PassthroughAuthMode && o.AuthMode != ARCAuthMode {
-		if o.ClientSecret == "" {
-			errs = append(errs, errors.New("azure.client-secret must be non-empty"))
+		if o.ClientSecret == "" && o.ClientAssertion == "" {
+			errs = append(errs, errors.New("azure.client-secret or azure.client-assertion must be non-empty"))
 		}
 	}
 	if o.AuthMode == AKSAuthMode && o.AKSTokenURL == "" {
@@ -156,7 +159,8 @@ func (o Options) Apply(d *apps.Deployment) (extraObjs []runtime.Object, err erro
 			Labels:    d.Labels,
 		},
 		Data: map[string][]byte{
-			"client-secret": []byte(o.ClientSecret),
+			"client-secret":    []byte(o.ClientSecret),
+			"client-assertion": []byte(o.ClientAssertion),
 		},
 	}
 	extraObjs = append(extraObjs, authSecret)
@@ -188,6 +192,17 @@ func (o Options) Apply(d *apps.Deployment) (extraObjs []runtime.Object, err erro
 					Name: authSecret.Name,
 				},
 				Key: "client-secret",
+			},
+		},
+	})
+	container.Env = append(container.Env, core.EnvVar{
+		Name: "AZURE_CLIENT_ASSERTION",
+		ValueFrom: &core.EnvVarSource{
+			SecretKeyRef: &core.SecretKeySelector{
+				LocalObjectReference: core.LocalObjectReference{
+					Name: authSecret.Name,
+				},
+				Key: "client-assertion",
 			},
 		},
 	})
