@@ -94,7 +94,7 @@ func getAuthServerAndUserInfo(returnCode int, body, clientID, clientSecret strin
 		headers:       http.Header{},
 		groupsPerCall: expandedGroupsPerCall,
 	}
-	u.tokenProvider = NewClientCredentialTokenProvider(clientID, clientSecret, ts.URL, "")
+	u.tokenProvider = NewClientCredentialTokenProvider(clientID, clientSecret, "", ts.URL, "")
 	return ts, u
 }
 
@@ -140,7 +140,7 @@ func TestLogin(t *testing.T) {
 			headers:       http.Header{},
 			groupsPerCall: expandedGroupsPerCall,
 		}
-		u.tokenProvider = NewClientCredentialTokenProvider("CIA", "outcome", badURL, "")
+		u.tokenProvider = NewClientCredentialTokenProvider("CIA", "outcome", "", badURL, "")
 
 		err := u.RefreshToken(ctx, "")
 		if err == nil {

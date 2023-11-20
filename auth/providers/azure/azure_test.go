@@ -130,7 +130,7 @@ func clientSetup(clientID, clientSecret, tenantID, serverUrl string, useGroupUID
 		ClientID:          clientID,
 	})
 
-	c.graphClient, err = graph.TestUserInfo(clientID, clientSecret, serverUrl+"/login", serverUrl+"/api", useGroupUID)
+	c.graphClient, err = graph.TestUserInfo(clientID, clientSecret, "", serverUrl+"/login", serverUrl+"/api", useGroupUID)
 	if err != nil {
 		return nil, err
 	}

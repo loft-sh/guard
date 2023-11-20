@@ -120,6 +120,7 @@ type DiscoverResourcesSettings struct {
 	tenantID           string
 	clientID           string
 	clientSecret       string
+	clientAssertion    string
 }
 
 type Display struct {
@@ -204,7 +205,7 @@ func ConvertIntToString(number int) string {
 	return strconv.Itoa(number)
 }
 
-func SetDiscoverResourcesSettings(clusterType string, environment string, loginURL string, kubeconfigFilePath string, tenantID string, clientID string, clientSecret string) error {
+func SetDiscoverResourcesSettings(clusterType string, environment string, loginURL string, kubeconfigFilePath string, tenantID string, clientID string, clientSecret string, clientAssertion string) error {
 	if settings == nil {
 		settings = &DiscoverResourcesSettings{
 			clusterType:        clusterType,
@@ -213,6 +214,7 @@ func SetDiscoverResourcesSettings(clusterType string, environment string, loginU
 			tenantID:           tenantID,
 			clientID:           clientID,
 			clientSecret:       clientSecret,
+			clientAssertion:    clientAssertion,
 		}
 
 		env := azure.PublicCloud
@@ -437,7 +439,7 @@ func fetchDataActionsList(ctx context.Context) ([]Operation, error) {
 
 	var token string
 	if settings.clusterType == ConnectedClusters {
-		tokenProvider := graph.NewClientCredentialTokenProvider(settings.clientID, settings.clientSecret,
+		tokenProvider := graph.NewClientCredentialTokenProvider(settings.clientID, settings.clientSecret, settings.clientAssertion,
 			fmt.Sprintf("%s%s/oauth2/v2.0/token", settings.environment.ActiveDirectoryEndpoint, settings.tenantID),
 			fmt.Sprintf("%s/.default", settings.environment.ResourceManagerEndpoint))
 
