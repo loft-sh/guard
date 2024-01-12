@@ -447,7 +447,7 @@ func getResultCacheKey(subRevReq *authzv1.SubjectAccessReviewSpec) string {
 	return cacheKey
 }
 
-func prepareCheckAccessRequestBody(req *authzv1.SubjectAccessReviewSpec, clusterType string, resourceId string, skipNamespace, useNamespaceResourceScopeFormat bool) ([]*CheckAccessRequest, error) {
+func prepareCheckAccessRequestBody(req *authzv1.SubjectAccessReviewSpec, clusterType string, resourceId string, skipNamespace, useNamespaceResourceScopeFormat bool) (string, []*CheckAccessRequest, error) {
 	/* This is how sample SubjectAccessReview request will look like
 		{
 			"kind": "SubjectAccessReview",
@@ -500,16 +500,22 @@ func prepareCheckAccessRequestBody(req *authzv1.SubjectAccessReviewSpec, cluster
 		val := oid.String()
 		userOid = val[1 : len(val)-1]
 		if !isValidUUID(userOid) {
-			return nil, errutils.WithCode(errors.New("oid info sent from authentication module is not valid"), http.StatusBadRequest)
+			return "", nil, errutils.WithCode(errors.New("oid info sent from authentication module is not valid"), http.StatusBadRequest)
 		}
 	} else {
-		return nil, errutils.WithCode(errors.New("oid info not sent from authentication module"), http.StatusBadRequest)
+		return "", nil, errutils.WithCode(errors.New("oid info not sent from authentication module"), http.StatusBadRequest)
 	}
+
+	var vCluster string
+	if vClusterVal, ok := req.Extra["vcluster"]; ok && len(vClusterVal) > 0 {
+		vCluster = vClusterVal[0]
+	}
+
 	groups := getValidSecurityGroups(req.Groups)
 	username = req.User
 	actions, err := getDataActions(req, clusterType)
 	if err != nil {
-		return nil, errutils.WithCode(errors.Wrap(err, "Error while creating list of dataactions for check access call"), http.StatusInternalServerError)
+		return "", nil, errutils.WithCode(errors.Wrap(err, "Error while creating list of dataactions for check access call"), http.StatusInternalServerError)
 	}
 	var checkAccessReqs []*CheckAccessRequest
 	for i := 0; i < len(actions); i += ActionBatchCount {
@@ -522,7 +528,9 @@ func prepareCheckAccessRequestBody(req *authzv1.SubjectAccessReviewSpec, cluster
 		checkaccessreq.Subject.Attributes.Groups = groups
 		checkaccessreq.Subject.Attributes.ObjectId = userOid
 		checkaccessreq.Actions = actions[i:j]
-		if skipNamespace {
+		if vCluster != "" {
+			checkaccessreq.Resource.Id = path.Join(resourceId, namespaces, "vcluster:"+vCluster)
+		} else if skipNamespace {
 			checkaccessreq.Resource.Id = resourceId
 		} else {
 			checkaccessreq.Resource.Id = getScope(resourceId, req.ResourceAttributes, useNamespaceResourceScopeFormat)
@@ -530,7 +538,7 @@ func prepareCheckAccessRequestBody(req *authzv1.SubjectAccessReviewSpec, cluster
 		checkAccessReqs = append(checkAccessReqs, &checkaccessreq)
 	}
 
-	return checkAccessReqs, nil
+	return vCluster, checkAccessReqs, nil
 }
 
 func getNameSpaceScope(req *authzv1.SubjectAccessReviewSpec, useNamespaceResourceScopeFormat bool) (bool, string) {

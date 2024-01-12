@@ -206,7 +206,14 @@ func New(opts authzOpts.Options, authopts auth.Options, authzInfo *AuthzInfo) (*
 	case authzOpts.FleetAuthzMode:
 		tokenProvider = graph.NewAKSTokenProvider(opts.AKSAuthzTokenURL, authopts.TenantID)
 	case authzOpts.AKSAuthzMode:
-		tokenProvider = graph.NewAKSTokenProvider(opts.AKSAuthzTokenURL, authopts.TenantID)
+		// if client secret is there check use client credential provider
+		if authopts.ClientSecret != "" || authopts.ClientAssertion != "" {
+			tokenProvider = graph.NewClientCredentialTokenProvider(authopts.ClientID, authopts.ClientSecret, authopts.ClientAssertion,
+				fmt.Sprintf("%s%s/oauth2/v2.0/token", authzInfo.AADEndpoint, authopts.TenantID),
+				fmt.Sprintf("%s.default", authzInfo.ARMEndPoint))
+		} else {
+			tokenProvider = graph.NewAKSTokenProvider(opts.AKSAuthzTokenURL, authopts.TenantID)
+		}
 	}
 
 	return newAccessInfo(tokenProvider, rbacURL, opts)
@@ -295,7 +302,7 @@ func (a *AccessInfo) setReqHeaders(req *http.Request) {
 }
 
 func (a *AccessInfo) CheckAccess(request *authzv1.SubjectAccessReviewSpec) (*authzv1.SubjectAccessReviewStatus, error) {
-	checkAccessBodies, err := prepareCheckAccessRequestBody(request, a.clusterType, a.azureResourceId, a.skipAuthzNamespace, a.useNamespaceResourceScopeFormat)
+	vCluster, checkAccessBodies, err := prepareCheckAccessRequestBody(request, a.clusterType, a.azureResourceId, a.skipAuthzNamespace, a.useNamespaceResourceScopeFormat)
 	if err != nil {
 		return nil, errors.Wrap(err, "error in preparing check access request")
 	}
@@ -303,7 +310,9 @@ func (a *AccessInfo) CheckAccess(request *authzv1.SubjectAccessReviewSpec) (*aut
 	checkAccessURL := *a.apiURL
 	// Append the path for azure cluster resource id
 	checkAccessURL.Path = path.Join(checkAccessURL.Path, a.azureResourceId)
-	if !a.skipAuthzNamespace {
+	if vCluster != "" {
+		checkAccessURL.Path = path.Join(checkAccessURL.Path, namespaces, "vcluster:"+vCluster)
+	} else if !a.skipAuthzNamespace {
 		exist, nameSpaceString := getNameSpaceScope(request, a.useNamespaceResourceScopeFormat)
 		if exist {
 			checkAccessURL.Path = path.Join(checkAccessURL.Path, nameSpaceString)
@@ -380,10 +389,10 @@ func (a *AccessInfo) sendCheckAccessRequest(ctx context.Context, checkAccessURL 
 		return errutils.WithCode(errors.Wrap(err, "error encoding check access request"), http.StatusInternalServerError)
 	}
 
-	if klog.V(10).Enabled() {
+	if true {
 		binaryData, _ := json.MarshalIndent(checkAccessBody, "", "    ")
-		klog.V(10).Infof("checkAccessURI:%s", checkAccessURL.String())
-		klog.V(10).Infof("binary data:%s", binaryData)
+		klog.Infof("checkAccessURI:%s", checkAccessURL.String())
+		klog.Infof("binary data:%s", binaryData)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, checkAccessURL.String(), buf)
@@ -419,7 +428,7 @@ func (a *AccessInfo) sendCheckAccessRequest(ctx context.Context, checkAccessURL 
 		return errutils.WithCode(errors.Wrap(err, "error in reading response body"), http.StatusInternalServerError)
 	}
 
-	klog.V(7).Infof("checkaccess response: %s, Configured ARM call limit: %d", string(data), a.armCallLimit)
+	klog.Infof("checkaccess response: %s, Configured ARM call limit: %d", string(data), a.armCallLimit)
 	if resp.StatusCode != http.StatusOK {
 		klog.Errorf("error in check access response. error code: %d, response: %s, correlationID: %s", resp.StatusCode, string(data), correlationID[0])
 		// metrics for calls with StatusCode >= 300

@@ -95,14 +95,6 @@ func (o *Options) Validate(azure azure.Options) []error {
 		errs = append(errs, errors.New("azure.resource-id must be non-empty for authorization"))
 	}
 
-	if (o.AuthzMode == AKSAuthzMode || o.AuthzMode == FleetAuthzMode) && o.AKSAuthzTokenURL == "" {
-		errs = append(errs, errors.New("azure.aks-authz-token-url must be non-empty"))
-	}
-
-	if o.AuthzMode != AKSAuthzMode && o.AuthzMode != FleetAuthzMode && o.AKSAuthzTokenURL != "" {
-		errs = append(errs, errors.New("azure.aks-authz-token-url must be set only with AKS/Fleet authz mode"))
-	}
-
 	if o.AuthzMode == ARCAuthzMode {
 		if azure.ClientID == "" {
 			errs = append(errs, errors.New("azure.client-id must be non-empty"))
